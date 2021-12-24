@@ -1,0 +1,137 @@
+TYPE
+  LOGLEVEL : (CRITICAL, WARNING, INFO, DEBUG) := INFO;
+END_TYPE
+
+FUNCTION_BLOCK LOGGER
+  VAR_INPUT
+    TRIG : BOOL;
+    MSG : STRING;
+    LEVEL : LOGLEVEL := INFO;
+  END_VAR
+  VAR
+    TRIG0 : BOOL;
+  END_VAR
+
+  IF TRIG AND NOT TRIG0 THEN
+  {{
+   LogMessage(GetFbVar(LEVEL),(char*)GetFbVar(MSG, .body),GetFbVar(MSG, .len));
+  }}
+  END_IF;
+  TRIG0:=TRIG;
+END_FUNCTION_BLOCK
+
+
+
+FUNCTION_BLOCK python_eval
+  VAR_INPUT
+    TRIG : BOOL;
+    CODE : STRING;
+  END_VAR
+  VAR_OUTPUT
+    ACK : BOOL;
+    RESULT : STRING;
+  END_VAR
+  VAR
+    STATE : DWORD;
+    BUFFER : STRING;
+    PREBUFFER : STRING;
+    TRIGM1 : BOOL;
+    TRIGGED : BOOL;
+  END_VAR
+
+  {extern void __PythonEvalFB(int, PYTHON_EVAL*);__PythonEvalFB(0, data__);}
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK python_poll
+  VAR_INPUT
+    TRIG : BOOL;
+    CODE : STRING;
+  END_VAR
+  VAR_OUTPUT
+    ACK : BOOL;
+    RESULT : STRING;
+  END_VAR
+  VAR
+    STATE : DWORD;
+    BUFFER : STRING;
+    PREBUFFER : STRING;
+    TRIGM1 : BOOL;
+    TRIGGED : BOOL;
+  END_VAR
+
+  {extern void __PythonEvalFB(int, PYTHON_EVAL*);__PythonEvalFB(1,(PYTHON_EVAL*)(void*)data__);}
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK python_gear
+  VAR_INPUT
+    N : UINT;
+    TRIG : BOOL;
+    CODE : STRING;
+  END_VAR
+  VAR_OUTPUT
+    ACK : BOOL;
+    RESULT : STRING;
+  END_VAR
+  VAR
+    py_eval : python_eval;
+    COUNTER : UINT;
+    ADD10_OUT : UINT;
+    EQ13_OUT : BOOL;
+    SEL15_OUT : UINT;
+    AND7_OUT : BOOL;
+  END_VAR
+
+  ADD10_OUT := ADD(COUNTER, 1);
+  EQ13_OUT := EQ(N, ADD10_OUT);
+  SEL15_OUT := SEL(EQ13_OUT, ADD10_OUT, 0);
+  COUNTER := SEL15_OUT;
+  AND7_OUT := AND(EQ13_OUT, TRIG);
+  py_eval(TRIG := AND7_OUT, CODE := CODE);
+  ACK := py_eval.ACK;
+  RESULT := py_eval.RESULT;
+END_FUNCTION_BLOCK
+
+
+PROGRAM program0
+  VAR_INPUT
+    i1 : BOOL;
+    i2 : BOOL;
+  END_VAR
+  VAR
+    CTU0 : CTU;
+  END_VAR
+  VAR_INPUT
+    reset : BOOL;
+    reset0 : BOOL;
+    CTU1 : CTU;
+  END_VAR
+  VAR_OUTPUT
+    count : INT;
+    count0 : INT;
+    out : BOOL;
+    out0 : BOOL;
+  END_VAR
+  VAR
+    CTD0 : CTD;
+    R_TRIG1 : R_TRIG;
+    R_TRIG2 : R_TRIG;
+  END_VAR
+
+  R_TRIG1(CLK := i1);
+  CTU0(CU := R_TRIG1.Q, R := reset, PV := 5);
+  out := CTU0.Q;
+  count := CTU0.CV;
+  R_TRIG2(CLK := i2);
+  CTD0(CD := R_TRIG2.Q, LD := reset0, PV := 10);
+  out0 := CTD0.Q;
+  count0 := CTD0.CV;
+END_PROGRAM
+
+
+CONFIGURATION Config0
+
+  RESOURCE Res0 ON PLC
+    TASK task0(INTERVAL := T#20ms,PRIORITY := 0);
+    PROGRAM instance0 WITH task0 : program0;
+  END_RESOURCE
+END_CONFIGURATION
